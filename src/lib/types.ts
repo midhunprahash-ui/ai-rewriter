@@ -15,6 +15,7 @@ export type LengthMode = (typeof LENGTH_MODES)[number];
 
 export type HumanizeRequest = {
   text: string;
+  context?: string;
   mode: HumanizeMode;
   strength: HumanizeStrength;
   lengthMode: LengthMode;

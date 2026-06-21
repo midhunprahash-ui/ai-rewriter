@@ -36,6 +36,7 @@ export function HumanizerWorkspace({
 }: HumanizerWorkspaceProps) {
   const router = useRouter();
   const [input, setInput] = useState("");
+  const [context, setContext] = useState("");
   const [output, setOutput] = useState("");
   const [mode, setMode] = useState<HumanizeMode>("professional_report");
   const [strength, setStrength] = useState<HumanizeStrength>("medium");
@@ -60,7 +61,13 @@ export function HumanizerWorkspace({
       const response = await fetch("/api/humanize", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text: input, mode, strength, lengthMode }),
+        body: JSON.stringify({
+          text: input,
+          context,
+          mode,
+          strength,
+          lengthMode,
+        }),
       });
 
       const payload = (await response.json()) as
@@ -118,6 +125,7 @@ export function HumanizerWorkspace({
 
   function clearWorkspace() {
     setInput("");
+    setContext("");
     setOutput("");
     setWarnings([]);
     setChangeSummary("");
@@ -257,6 +265,17 @@ export function HumanizerWorkspace({
                     </option>
                   ))}
                 </select>
+              </label>
+
+              <label className="space-y-1 text-sm font-medium">
+                <span>Context notes</span>
+                <textarea
+                  className="h-28 w-full resize-none rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm font-normal leading-5 outline-none focus:border-emerald-700 focus:ring-2 focus:ring-emerald-100"
+                  value={context}
+                  maxLength={2000}
+                  onChange={(event) => setContext(event.target.value)}
+                  placeholder="Service type, period, documents reviewed, scope limits, client representation."
+                />
               </label>
 
               <button

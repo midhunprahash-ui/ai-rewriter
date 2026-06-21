@@ -13,6 +13,7 @@ import {
 import { getGeminiApiKey, getGeminiModelCandidates } from "@/lib/env";
 
 const MAX_INPUT_CHARS = 12_000;
+const MAX_CONTEXT_CHARS = 2_000;
 
 const SYSTEM_INSTRUCTION = [
   "You are a senior drafting assistant for an Indian Chartered Accountant.",
@@ -27,6 +28,7 @@ const SYSTEM_INSTRUCTION = [
   "Preserve amounts, percentages, dates, FY/AY references, section/rule references, names, PAN/GSTIN-like identifiers, invoice numbers, document references, assumptions, caveats, and limitations.",
   "If the source is ambiguous or insufficient, include a warning instead of silently filling the gap.",
   "If the source is too generic to sound genuinely authored, warn that more document-specific context is needed; do not invent that context.",
+  "Use reviewer context only as user-supplied grounding for the draft. Do not invent context that was not provided.",
   "Do not make claims about AI detection, detector scores, plagiarism, originality, or bypassing detectors.",
   "Return only valid JSON matching the requested shape.",
 ].join(" ");
@@ -72,6 +74,7 @@ const HUMAN_STYLE_GUIDELINES = [
   "Do not start every paragraph with a formal transition.",
   "Do not add a polished summary sentence unless the source already implies one.",
   "Keep caveats and limitations close to the relevant facts instead of moving them into generic closing language.",
+  "For engagement disclaimers, avoid grand legal boilerplate. Use compact, plain wording and keep the client's responsibility, reliance basis, and limitation of responsibility clear.",
   "For Indian CA work, use natural phrases like based on our review, we noted, the records indicate, or management has represented only where supported by the source.",
   "If a sentence is already human and serviceable, keep it close to the original instead of replacing it with a template.",
   "Prefer one concrete, source-based sentence over two generic polished sentences.",
@@ -100,6 +103,8 @@ export function normalizeHumanizeRequest(input: unknown): HumanizeRequest {
 
   const record = input as Record<string, unknown>;
   const text = typeof record.text === "string" ? record.text.trim() : "";
+  const context =
+    typeof record.context === "string" ? record.context.trim() : "";
   const mode = normalizeOption(
     record.mode,
     HUMANIZE_MODES,
@@ -122,13 +127,19 @@ export function normalizeHumanizeRequest(input: unknown): HumanizeRequest {
     );
   }
 
-  if (containsDetectorBypassIntent(text)) {
+  if (context.length > MAX_CONTEXT_CHARS) {
+    throw new Error(
+      `Please keep the context under ${MAX_CONTEXT_CHARS} characters.`,
+    );
+  }
+
+  if (containsDetectorBypassIntent(`${text}\n${context}`)) {
     throw new Error(
       "This tool does not support AI-detector bypass requests. Use it to humanize professional wording and review.",
     );
   }
 
-  return { text, mode, strength, lengthMode };
+  return { text, context: context || undefined, mode, strength, lengthMode };
 }
 
 export async function generateHumanizedText(
@@ -161,10 +172,18 @@ export async function generateHumanizedText(
     criticalItems,
     result.output,
   );
+  const specificityWarnings = findSpecificityWarnings(
+    request,
+    criticalItems,
+  );
 
   return {
     ...result,
-    warnings: uniqueStrings([...result.warnings, ...preservationWarnings]),
+    warnings: uniqueStrings([
+      ...result.warnings,
+      ...preservationWarnings,
+      ...specificityWarnings,
+    ]),
     preservedItems: uniqueStrings([...criticalItems, ...result.preservedItems]),
   };
 }
@@ -300,6 +319,12 @@ function buildPrompt(request: HumanizeRequest, criticalItems: string[]): string 
     HUMAN_STYLE_GUIDELINES.map((item) => `- ${item}`).join("\n"),
     "Style examples. Follow the drafting approach, not the exact wording:",
     STYLE_EXAMPLES.join("\n\n"),
+    request.context
+      ? [
+          "Reviewer context supplied by the user. Use this only where it is relevant and consistent with the source:",
+          request.context,
+        ].join("\n")
+      : "Reviewer context: none supplied. Do not add client-specific facts. If the source is generic boilerplate, keep the output conservative and warn that context is needed.",
     criticalItems.length > 0
       ? `Critical items to preserve exactly: ${criticalItems.join("; ")}.`
       : "No critical financial/legal tokens were automatically detected; still preserve all facts.",
@@ -379,6 +404,35 @@ function containsDetectorBypassIntent(text: string): boolean {
     "stealth writer",
     "stealthwriter",
   ].some((phrase) => normalized.includes(phrase));
+}
+
+function findSpecificityWarnings(
+  request: HumanizeRequest,
+  criticalItems: string[],
+): string[] {
+  if (request.context && request.context.length >= 20) {
+    return [];
+  }
+
+  const documentSignals = [
+    /\b(?:GST|TDS|TCS|income tax|audit|assurance|compilation|certification|ITR|GSTR|MCA|ROC)\b/i,
+    /\b(?:ledger|invoice|bank statement|return|notice|assessment|working paper|agreement|engagement letter)\b/i,
+    /\b(?:FY|F\.Y\.|AY|A\.Y\.)\s*\d{4}/i,
+    /\b\d{1,2}[/-]\d{1,2}[/-]\d{2,4}\b/,
+    /\b[A-Z]{5}[0-9]{4}[A-Z]\b/,
+    /\b[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z][1-9A-Z]Z[0-9A-Z]\b/,
+  ];
+  const hasDocumentSignals =
+    criticalItems.length > 0 ||
+    documentSignals.some((pattern) => pattern.test(request.text));
+
+  if (hasDocumentSignals || request.text.length < 120) {
+    return [];
+  }
+
+  return [
+    "Source is generic. Add engagement-specific context such as service type, period, documents relied on, and limitation of scope for a more natural CA draft.",
+  ];
 }
 
 function parseHumanizeResult(raw: string): HumanizeResult {
