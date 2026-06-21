@@ -17,8 +17,10 @@ const MAX_INPUT_CHARS = 12_000;
 const SYSTEM_INSTRUCTION = [
   "You are a senior drafting assistant for an Indian Chartered Accountant.",
   "Humanize professional text so it reads like a careful Indian CA drafted it, not like a generic AI template.",
-  "Make the wording natural, measured, specific, and professionally human while preserving formal Indian English.",
-  "Vary sentence rhythm and improve flow, but do not use casual slang, filler, personal anecdotes, jokes, or marketing language.",
+  "Make the wording natural, measured, specific, and professionally human while preserving Indian business English.",
+  "Keep some of the source writer's texture where it is acceptable; do not over-smooth every sentence.",
+  "Vary sentence rhythm and paragraph shape, but do not use casual slang, filler, personal anecdotes, jokes, or marketing language.",
+  "Avoid generic AI-style connectors and filler such as moreover, furthermore, in conclusion, it is important to note, it is pertinent to mention, comprehensive, robust, seamless, leverage, and underscores.",
   "Preserve the user's meaning and all facts exactly.",
   "Do not invent statutory references, legal conclusions, audit evidence, compliance status, figures, dates, parties, or document references.",
   "Preserve amounts, percentages, dates, FY/AY references, section/rule references, names, PAN/GSTIN-like identifiers, invoice numbers, document references, assumptions, caveats, and limitations.",
@@ -60,6 +62,17 @@ const RESPONSE_SCHEMA = {
     },
   },
 };
+
+const HUMAN_STYLE_GUIDELINES = [
+  "Prefer plain, precise words over grand or abstract wording.",
+  "Use contractions only if the selected mode is client-facing and the source tone allows it; otherwise stay professional.",
+  "Use a mix of short and medium sentences instead of evenly balanced long sentences.",
+  "Do not start every paragraph with a formal transition.",
+  "Do not add a polished summary sentence unless the source already implies one.",
+  "Keep caveats and limitations close to the relevant facts instead of moving them into generic closing language.",
+  "For Indian CA work, use natural phrases like based on our review, we noted, the records indicate, or management has represented only where supported by the source.",
+  "If a sentence is already human and serviceable, keep it close to the original instead of replacing it with a template.",
+];
 
 export function normalizeHumanizeRequest(input: unknown): HumanizeRequest {
   if (!input || typeof input !== "object") {
@@ -115,8 +128,8 @@ export async function generateHumanizedText(
     contents: buildPrompt(request, criticalItems),
     config: {
       systemInstruction: SYSTEM_INSTRUCTION,
-      temperature: 0.25,
-      topP: 0.8,
+      temperature: getTemperature(request.strength),
+      topP: 0.95,
       maxOutputTokens: 4096,
       responseMimeType: "application/json",
       responseJsonSchema: RESPONSE_SCHEMA,
@@ -262,6 +275,9 @@ function buildPrompt(request: HumanizeRequest, criticalItems: string[]): string 
     "Required JSON keys: output, changeSummary, warnings, preservedItems, scores.",
     "Scores must be numbers from 0 to 100 for clarity, formality, and preservation.",
     "Humanized output should feel natural and professionally drafted while avoiding casual language and unsupported additions.",
+    "Do not claim or imply that the output will pass AI detectors.",
+    "Natural style guidelines:",
+    HUMAN_STYLE_GUIDELINES.map((item) => `- ${item}`).join("\n"),
     criticalItems.length > 0
       ? `Critical items to preserve exactly: ${criticalItems.join("; ")}.`
       : "No critical financial/legal tokens were automatically detected; still preserve all facts.",
@@ -289,12 +305,25 @@ function describeMode(mode: HumanizeMode): string {
 
 function describeStrength(strength: HumanizeStrength): string {
   const descriptions: Record<HumanizeStrength, string> = {
-    light: "light humanization; retain most wording while reducing robotic phrasing",
-    medium: "natural humanization; improve flow, precision, and sentence rhythm while preserving structure",
-    strong: "polished humanization; substantially improve flow and readability without changing facts",
+    light:
+      "light humanization; retain most wording while reducing robotic phrasing",
+    medium:
+      "balanced humanization; improve flow and sentence rhythm without making the text sound overly polished",
+    strong:
+      "more natural humanization; remove template-like phrasing and vary expression without changing facts",
   };
 
   return descriptions[strength];
+}
+
+function getTemperature(strength: HumanizeStrength): number {
+  const temperatures: Record<HumanizeStrength, number> = {
+    light: 0.35,
+    medium: 0.55,
+    strong: 0.65,
+  };
+
+  return temperatures[strength];
 }
 
 function describeLength(lengthMode: LengthMode): string {

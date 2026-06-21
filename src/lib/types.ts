@@ -60,8 +60,8 @@ export const MODE_LABELS: Record<HumanizeMode, string> = {
 
 export const STRENGTH_LABELS: Record<HumanizeStrength, string> = {
   light: "Light",
-  medium: "Natural",
-  strong: "Polished",
+  medium: "Balanced",
+  strong: "More natural",
 };
 
 export const LENGTH_LABELS: Record<LengthMode, string> = {
