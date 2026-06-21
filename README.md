@@ -34,6 +34,7 @@ Open [http://localhost:3000](http://localhost:3000).
 
 - Gemini calls only run in `src/app/api/rewrite/route.ts`.
 - Supabase sessions are refreshed through `src/proxy.ts`.
+- Google OAuth redirects through `src/app/auth/callback/route.ts`.
 - RLS policies restrict every user-owned table to `auth.uid()`.
 - The product is a professional rewrite assistant, not an AI-detection bypass tool.
 

@@ -14,6 +14,7 @@ export function AuthPanel() {
   const [password, setPassword] = useState("");
   const [message, setMessage] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isGoogleSubmitting, setIsGoogleSubmitting] = useState(false);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -41,6 +42,27 @@ export function AuthPanel() {
     router.refresh();
   }
 
+  async function handleGoogleSignIn() {
+    setMessage("");
+    setIsGoogleSubmitting(true);
+
+    const supabase = createSupabaseBrowserClient();
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: "google",
+      options: {
+        redirectTo: `${window.location.origin}/auth/callback`,
+        queryParams: {
+          prompt: "select_account",
+        },
+      },
+    });
+
+    if (error) {
+      setMessage(error.message);
+      setIsGoogleSubmitting(false);
+    }
+  }
+
   return (
     <main className="mx-auto flex min-h-dvh w-full max-w-sm flex-col justify-center px-5">
       <div className="space-y-8">
@@ -55,6 +77,27 @@ export function AuthPanel() {
         </div>
 
         <form className="space-y-4" onSubmit={handleSubmit}>
+          <button
+            className="flex h-11 w-full items-center justify-center gap-2 rounded-md border border-zinc-300 bg-white px-4 text-sm font-medium text-zinc-900 transition hover:bg-zinc-50 disabled:cursor-not-allowed disabled:text-zinc-400"
+            type="button"
+            onClick={handleGoogleSignIn}
+            disabled={isSubmitting || isGoogleSubmitting}
+          >
+            <span
+              aria-hidden="true"
+              className="grid size-5 place-items-center rounded-full border border-zinc-300 text-xs font-semibold"
+            >
+              G
+            </span>
+            {isGoogleSubmitting ? "Redirecting" : "Continue with Google"}
+          </button>
+
+          <div className="flex items-center gap-3 text-xs text-zinc-400">
+            <span className="h-px flex-1 bg-zinc-200" />
+            <span>Email</span>
+            <span className="h-px flex-1 bg-zinc-200" />
+          </div>
+
           <label className="block space-y-2 text-sm font-medium text-zinc-800">
             <span>Email</span>
             <input
