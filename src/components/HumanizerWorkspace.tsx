@@ -11,34 +11,34 @@ import {
   WandSparkles,
 } from "lucide-react";
 import {
+  HUMANIZE_MODES,
+  HUMANIZE_STRENGTHS,
   LENGTH_LABELS,
   LENGTH_MODES,
   MODE_LABELS,
-  REWRITE_MODES,
-  REWRITE_STRENGTHS,
   STRENGTH_LABELS,
+  type HumanizeApiResponse,
+  type HumanizeHistoryItem,
+  type HumanizeMode,
+  type HumanizeStrength,
   type LengthMode,
-  type RewriteApiResponse,
-  type RewriteHistoryItem,
-  type RewriteMode,
-  type RewriteStrength,
 } from "@/lib/types";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 
-type RewriterWorkspaceProps = {
+type HumanizerWorkspaceProps = {
   userEmail: string;
-  initialHistory: RewriteHistoryItem[];
+  initialHistory: HumanizeHistoryItem[];
 };
 
-export function RewriterWorkspace({
+export function HumanizerWorkspace({
   userEmail,
   initialHistory,
-}: RewriterWorkspaceProps) {
+}: HumanizerWorkspaceProps) {
   const router = useRouter();
   const [input, setInput] = useState("");
   const [output, setOutput] = useState("");
-  const [mode, setMode] = useState<RewriteMode>("professional_report");
-  const [strength, setStrength] = useState<RewriteStrength>("medium");
+  const [mode, setMode] = useState<HumanizeMode>("professional_report");
+  const [strength, setStrength] = useState<HumanizeStrength>("medium");
   const [lengthMode, setLengthMode] = useState<LengthMode>("preserve");
   const [warnings, setWarnings] = useState<string[]>([]);
   const [changeSummary, setChangeSummary] = useState("");
@@ -49,7 +49,7 @@ export function RewriterWorkspace({
 
   const latestHistory = useMemo(() => history.slice(0, 8), [history]);
 
-  async function handleRewrite(event: FormEvent<HTMLFormElement>) {
+  async function handleHumanize(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError("");
     setWarnings([]);
@@ -57,31 +57,33 @@ export function RewriterWorkspace({
     setIsLoading(true);
 
     try {
-      const response = await fetch("/api/rewrite", {
+      const response = await fetch("/api/humanize", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ text: input, mode, strength, lengthMode }),
       });
 
       const payload = (await response.json()) as
-        | RewriteApiResponse
+        | HumanizeApiResponse
         | { error?: string };
 
       if (!response.ok) {
-        throw new Error("error" in payload ? payload.error : "Rewrite failed.");
+        throw new Error(
+          "error" in payload ? payload.error : "Humanization failed.",
+        );
       }
 
-      const result = payload as RewriteApiResponse;
+      const result = payload as HumanizeApiResponse;
       setOutput(result.output);
       setWarnings(result.warnings);
       setChangeSummary(result.changeSummary);
 
-      if (result.rewriteId) {
+      if (result.humanizationId) {
         setHistory((current) => [
           {
-            id: result.rewriteId ?? crypto.randomUUID(),
+            id: result.humanizationId ?? crypto.randomUUID(),
             originalText: input,
-            rewrittenText: result.output,
+            humanizedText: result.output,
             mode,
             strength,
             lengthMode,
@@ -92,7 +94,9 @@ export function RewriterWorkspace({
         ]);
       }
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : "Rewrite failed.");
+      setError(
+        reason instanceof Error ? reason.message : "Humanization failed.",
+      );
     } finally {
       setIsLoading(false);
     }
@@ -125,9 +129,9 @@ export function RewriterWorkspace({
       <header className="border-b border-zinc-200 bg-white">
         <div className="mx-auto flex h-14 max-w-7xl items-center justify-between px-4 sm:px-6">
           <div>
-            <h1 className="text-base font-semibold">AI Rewriter</h1>
+            <h1 className="text-base font-semibold">AI Humanizer</h1>
             <p className="text-xs text-zinc-500">
-              Formal Indian English for CA reports
+              Natural Indian English for CA reports
             </p>
           </div>
           <div className="flex items-center gap-3">
@@ -148,7 +152,7 @@ export function RewriterWorkspace({
 
       <form
         className="mx-auto grid max-w-7xl gap-4 px-4 py-4 sm:px-6 lg:grid-cols-[1fr_320px]"
-        onSubmit={handleRewrite}
+        onSubmit={handleHumanize}
       >
         <section className="grid min-h-[calc(100dvh-7rem)] gap-4 lg:grid-cols-2">
           <div className="flex min-h-[320px] flex-col rounded-md border border-zinc-200 bg-white">
@@ -171,7 +175,7 @@ export function RewriterWorkspace({
 
           <div className="flex min-h-[320px] flex-col rounded-md border border-zinc-200 bg-white">
             <div className="flex h-11 items-center justify-between border-b border-zinc-200 px-3">
-              <span className="text-sm font-medium">Rewrite</span>
+              <span className="text-sm font-medium">Humanized</span>
               <div className="flex items-center gap-1">
                 <button
                   className="inline-flex size-8 items-center justify-center rounded-md text-zinc-600 transition hover:bg-zinc-100 disabled:text-zinc-300"
@@ -196,7 +200,7 @@ export function RewriterWorkspace({
               className="min-h-0 flex-1 resize-none bg-transparent p-3 text-sm leading-6 outline-none"
               value={output}
               onChange={(event) => setOutput(event.target.value)}
-              placeholder="The rewritten text will appear here."
+              placeholder="The humanized text will appear here."
             />
           </div>
         </section>
@@ -209,9 +213,11 @@ export function RewriterWorkspace({
                 <select
                   className="h-10 w-full rounded-md border border-zinc-300 bg-white px-3 text-sm outline-none focus:border-emerald-700 focus:ring-2 focus:ring-emerald-100"
                   value={mode}
-                  onChange={(event) => setMode(event.target.value as RewriteMode)}
+                  onChange={(event) =>
+                    setMode(event.target.value as HumanizeMode)
+                  }
                 >
-                  {REWRITE_MODES.map((item) => (
+                  {HUMANIZE_MODES.map((item) => (
                     <option key={item} value={item}>
                       {MODE_LABELS[item]}
                     </option>
@@ -220,15 +226,15 @@ export function RewriterWorkspace({
               </label>
 
               <label className="space-y-1 text-sm font-medium">
-                <span>Strength</span>
+                <span>Humanization</span>
                 <select
                   className="h-10 w-full rounded-md border border-zinc-300 bg-white px-3 text-sm outline-none focus:border-emerald-700 focus:ring-2 focus:ring-emerald-100"
                   value={strength}
                   onChange={(event) =>
-                    setStrength(event.target.value as RewriteStrength)
+                    setStrength(event.target.value as HumanizeStrength)
                   }
                 >
-                  {REWRITE_STRENGTHS.map((item) => (
+                  {HUMANIZE_STRENGTHS.map((item) => (
                     <option key={item} value={item}>
                       {STRENGTH_LABELS[item]}
                     </option>
@@ -259,11 +265,15 @@ export function RewriterWorkspace({
                 disabled={isLoading || input.trim().length < 20}
               >
                 {isLoading ? (
-                  <Loader2 className="animate-spin" aria-hidden="true" size={16} />
+                  <Loader2
+                    className="animate-spin"
+                    aria-hidden="true"
+                    size={16}
+                  />
                 ) : (
                   <WandSparkles aria-hidden="true" size={16} />
                 )}
-                {isLoading ? "Rewriting" : "Rewrite"}
+                {isLoading ? "Humanizing" : "Humanize"}
               </button>
             </div>
           </div>
@@ -305,7 +315,7 @@ export function RewriterWorkspace({
                     type="button"
                     onClick={() => {
                       setInput(item.originalText);
-                      setOutput(item.rewrittenText);
+                      setOutput(item.humanizedText);
                       setMode(item.mode);
                       setStrength(item.strength);
                       setLengthMode(item.lengthMode);
@@ -325,15 +335,15 @@ export function RewriterWorkspace({
                 ))
               ) : (
                 <p className="px-3 py-6 text-sm text-zinc-500">
-                  No rewrites yet.
+                  No humanized outputs yet.
                 </p>
               )}
             </div>
           </div>
 
           <p className="text-xs leading-5 text-zinc-500">
-            Review before use. The tool preserves source facts; it does not
-            create audit evidence or legal positions.
+            Review before use. The tool humanizes tone and flow while preserving
+            source facts; it does not create audit evidence or legal positions.
           </p>
         </aside>
       </form>

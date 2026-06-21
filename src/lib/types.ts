@@ -1,4 +1,4 @@
-export const REWRITE_MODES = [
+export const HUMANIZE_MODES = [
   "professional_report",
   "audit_observation",
   "management_comment",
@@ -6,51 +6,51 @@ export const REWRITE_MODES = [
   "client_explanation",
 ] as const;
 
-export const REWRITE_STRENGTHS = ["light", "medium", "strong"] as const;
+export const HUMANIZE_STRENGTHS = ["light", "medium", "strong"] as const;
 export const LENGTH_MODES = ["preserve", "shorter", "longer"] as const;
 
-export type RewriteMode = (typeof REWRITE_MODES)[number];
-export type RewriteStrength = (typeof REWRITE_STRENGTHS)[number];
+export type HumanizeMode = (typeof HUMANIZE_MODES)[number];
+export type HumanizeStrength = (typeof HUMANIZE_STRENGTHS)[number];
 export type LengthMode = (typeof LENGTH_MODES)[number];
 
-export type RewriteRequest = {
+export type HumanizeRequest = {
   text: string;
-  mode: RewriteMode;
-  strength: RewriteStrength;
+  mode: HumanizeMode;
+  strength: HumanizeStrength;
   lengthMode: LengthMode;
 };
 
-export type RewriteScores = {
+export type HumanizeScores = {
   clarity: number;
   formality: number;
   preservation: number;
 };
 
-export type RewriteResult = {
+export type HumanizeResult = {
   output: string;
   changeSummary: string;
   warnings: string[];
   preservedItems: string[];
-  scores: RewriteScores;
+  scores: HumanizeScores;
 };
 
-export type RewriteApiResponse = RewriteResult & {
-  rewriteId: string | null;
+export type HumanizeApiResponse = HumanizeResult & {
+  humanizationId: string | null;
   createdAt: string;
 };
 
-export type RewriteHistoryItem = {
+export type HumanizeHistoryItem = {
   id: string;
   originalText: string;
-  rewrittenText: string;
-  mode: RewriteMode;
-  strength: RewriteStrength;
+  humanizedText: string;
+  mode: HumanizeMode;
+  strength: HumanizeStrength;
   lengthMode: LengthMode;
   warnings: string[];
   createdAt: string;
 };
 
-export const MODE_LABELS: Record<RewriteMode, string> = {
+export const MODE_LABELS: Record<HumanizeMode, string> = {
   professional_report: "Professional report",
   audit_observation: "Audit observation",
   management_comment: "Management comment",
@@ -58,10 +58,10 @@ export const MODE_LABELS: Record<RewriteMode, string> = {
   client_explanation: "Client explanation",
 };
 
-export const STRENGTH_LABELS: Record<RewriteStrength, string> = {
+export const STRENGTH_LABELS: Record<HumanizeStrength, string> = {
   light: "Light",
-  medium: "Medium",
-  strong: "Strong",
+  medium: "Natural",
+  strong: "Polished",
 };
 
 export const LENGTH_LABELS: Record<LengthMode, string> = {

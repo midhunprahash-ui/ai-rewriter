@@ -1,14 +1,14 @@
 import { GoogleGenAI } from "@google/genai";
 import {
+  HUMANIZE_MODES,
+  HUMANIZE_STRENGTHS,
   LENGTH_MODES,
-  REWRITE_MODES,
-  REWRITE_STRENGTHS,
+  type HumanizeMode,
+  type HumanizeRequest,
+  type HumanizeResult,
+  type HumanizeScores,
+  type HumanizeStrength,
   type LengthMode,
-  type RewriteMode,
-  type RewriteRequest,
-  type RewriteResult,
-  type RewriteScores,
-  type RewriteStrength,
 } from "@/lib/types";
 import { getGeminiApiKey, getGeminiModelCandidates } from "@/lib/env";
 
@@ -16,12 +16,14 @@ const MAX_INPUT_CHARS = 12_000;
 
 const SYSTEM_INSTRUCTION = [
   "You are a senior drafting assistant for an Indian Chartered Accountant.",
-  "Rewrite text for professional reports using formal legal-style Indian English.",
+  "Humanize professional text so it reads like a careful Indian CA drafted it, not like a generic AI template.",
+  "Make the wording natural, measured, specific, and professionally human while preserving formal Indian English.",
+  "Vary sentence rhythm and improve flow, but do not use casual slang, filler, personal anecdotes, jokes, or marketing language.",
   "Preserve the user's meaning and all facts exactly.",
   "Do not invent statutory references, legal conclusions, audit evidence, compliance status, figures, dates, parties, or document references.",
   "Preserve amounts, percentages, dates, FY/AY references, section/rule references, names, PAN/GSTIN-like identifiers, invoice numbers, document references, assumptions, caveats, and limitations.",
   "If the source is ambiguous or insufficient, include a warning instead of silently filling the gap.",
-  "Never make claims about bypassing AI detection.",
+  "Do not make claims about AI detection, detector scores, plagiarism, originality, or bypassing detectors.",
   "Return only valid JSON matching the requested shape.",
 ].join(" ");
 
@@ -59,7 +61,7 @@ const RESPONSE_SCHEMA = {
   },
 };
 
-export function normalizeRewriteRequest(input: unknown): RewriteRequest {
+export function normalizeHumanizeRequest(input: unknown): HumanizeRequest {
   if (!input || typeof input !== "object") {
     throw new Error("Invalid request body.");
   }
@@ -68,32 +70,38 @@ export function normalizeRewriteRequest(input: unknown): RewriteRequest {
   const text = typeof record.text === "string" ? record.text.trim() : "";
   const mode = normalizeOption(
     record.mode,
-    REWRITE_MODES,
+    HUMANIZE_MODES,
     "professional_report",
   );
-  const strength = normalizeOption(record.strength, REWRITE_STRENGTHS, "medium");
+  const strength = normalizeOption(
+    record.strength,
+    HUMANIZE_STRENGTHS,
+    "medium",
+  );
   const lengthMode = normalizeOption(record.lengthMode, LENGTH_MODES, "preserve");
 
   if (text.length < 20) {
-    throw new Error("Please enter at least 20 characters to rewrite.");
+    throw new Error("Please enter at least 20 characters to humanize.");
   }
 
   if (text.length > MAX_INPUT_CHARS) {
-    throw new Error(`Please keep the input under ${MAX_INPUT_CHARS} characters.`);
+    throw new Error(
+      `Please keep the input under ${MAX_INPUT_CHARS} characters.`,
+    );
   }
 
   if (containsDetectorBypassIntent(text)) {
     throw new Error(
-      "This tool does not support AI-detector bypass requests. Use it for professional rewriting and review.",
+      "This tool does not support AI-detector bypass requests. Use it to humanize professional wording and review.",
     );
   }
 
   return { text, mode, strength, lengthMode };
 }
 
-export async function generateProfessionalRewrite(
-  request: RewriteRequest,
-): Promise<RewriteResult> {
+export async function generateHumanizedText(
+  request: HumanizeRequest,
+): Promise<HumanizeResult> {
   const apiKey = getGeminiApiKey();
 
   if (!apiKey) {
@@ -116,7 +124,7 @@ export async function generateProfessionalRewrite(
   });
 
   const raw = response.text ?? "";
-  const result = parseRewriteResult(raw);
+  const result = parseHumanizeResult(raw);
   const preservationWarnings = findMissingCriticalItems(
     criticalItems,
     result.output,
@@ -244,15 +252,16 @@ export function extractCriticalItems(text: string): string[] {
   );
 }
 
-function buildPrompt(request: RewriteRequest, criticalItems: string[]): string {
+function buildPrompt(request: HumanizeRequest, criticalItems: string[]): string {
   return [
-    "Rewrite the following text.",
-    `Mode: ${describeMode(request.mode)}.`,
-    `Rewrite strength: ${describeStrength(request.strength)}.`,
+    "Humanize the following text.",
+    `Humanization mode: ${describeMode(request.mode)}.`,
+    `Humanization strength: ${describeStrength(request.strength)}.`,
     `Length instruction: ${describeLength(request.lengthMode)}.`,
     "Jurisdiction context: India.",
     "Required JSON keys: output, changeSummary, warnings, preservedItems, scores.",
     "Scores must be numbers from 0 to 100 for clarity, formality, and preservation.",
+    "Humanized output should feel natural and professionally drafted while avoiding casual language and unsupported additions.",
     criticalItems.length > 0
       ? `Critical items to preserve exactly: ${criticalItems.join("; ")}.`
       : "No critical financial/legal tokens were automatically detected; still preserve all facts.",
@@ -261,28 +270,28 @@ function buildPrompt(request: RewriteRequest, criticalItems: string[]): string {
   ].join("\n\n");
 }
 
-function describeMode(mode: RewriteMode): string {
-  const descriptions: Record<RewriteMode, string> = {
+function describeMode(mode: HumanizeMode): string {
+  const descriptions: Record<HumanizeMode, string> = {
     professional_report:
-      "formal professional report paragraph suitable for Indian CA deliverables",
+      "natural professional report paragraph suitable for Indian CA deliverables",
     audit_observation:
-      "precise audit observation, non-accusatory, evidence-aware, and caveated",
+      "human, precise audit observation that is non-accusatory, evidence-aware, and caveated",
     management_comment:
-      "formal management comment with clear issue, implication, and corrective framing",
+      "natural management comment with clear issue, implication, and corrective framing",
     tax_compliance:
       "conservative tax or compliance paragraph without adding legal positions",
     client_explanation:
-      "clear client-facing explanation in professional Indian English",
+      "clear client-facing explanation in natural professional Indian English",
   };
 
   return descriptions[mode];
 }
 
-function describeStrength(strength: RewriteStrength): string {
-  const descriptions: Record<RewriteStrength, string> = {
-    light: "minimal edits; retain most wording and structure",
-    medium: "improve flow, precision, and professional tone while preserving structure",
-    strong: "substantial rewrite for clarity and report-readiness without changing facts",
+function describeStrength(strength: HumanizeStrength): string {
+  const descriptions: Record<HumanizeStrength, string> = {
+    light: "light humanization; retain most wording while reducing robotic phrasing",
+    medium: "natural humanization; improve flow, precision, and sentence rhythm while preserving structure",
+    strong: "polished humanization; substantially improve flow and readability without changing facts",
   };
 
   return descriptions[strength];
@@ -321,11 +330,11 @@ function containsDetectorBypassIntent(text: string): boolean {
   ].some((phrase) => normalized.includes(phrase));
 }
 
-function parseRewriteResult(raw: string): RewriteResult {
+function parseHumanizeResult(raw: string): HumanizeResult {
   const parsed = parseModelJson(raw);
 
   if (parsed !== null) {
-    return coerceRewriteResult(parsed);
+    return coerceHumanizeResult(parsed);
   }
 
   const output = stripMarkdownFence(raw).trim();
@@ -337,9 +346,9 @@ function parseRewriteResult(raw: string): RewriteResult {
   return {
     output,
     changeSummary:
-      "Gemini returned an unstructured response, so it was used as the rewrite output.",
+      "Gemini returned an unstructured response, so it was used as the humanized output.",
     warnings: [
-      "Review required: Gemini did not return structured JSON for this rewrite.",
+      "Review required: Gemini did not return structured JSON for this humanization.",
     ],
     preservedItems: [],
     scores: {
@@ -439,30 +448,30 @@ function extractFirstJsonObject(value: string): string | null {
   return null;
 }
 
-function coerceRewriteResult(value: unknown): RewriteResult {
+function coerceHumanizeResult(value: unknown): HumanizeResult {
   if (!value || typeof value !== "object") {
-    throw new Error("Gemini returned an invalid rewrite payload.");
+    throw new Error("Gemini returned an invalid humanization payload.");
   }
 
   const record = value as Record<string, unknown>;
   const output = asString(record.output);
 
   if (!output) {
-    throw new Error("Gemini returned an empty rewrite.");
+    throw new Error("Gemini returned an empty humanized output.");
   }
 
   return {
     output,
     changeSummary:
       asString(record.changeSummary) ||
-      "Rewritten for formal CA report clarity and tone.",
+      "Humanized for natural CA report clarity and tone.",
     warnings: asStringArray(record.warnings),
     preservedItems: asStringArray(record.preservedItems),
     scores: coerceScores(record.scores),
   };
 }
 
-function coerceScores(value: unknown): RewriteScores {
+function coerceScores(value: unknown): HumanizeScores {
   const record =
     value && typeof value === "object" ? (value as Record<string, unknown>) : {};
 
@@ -478,7 +487,10 @@ function findMissingCriticalItems(items: string[], output: string): string[] {
 
   return items
     .filter((item) => !normalizedOutput.includes(item.toLowerCase()))
-    .map((item) => `Review required: critical item may not be preserved exactly: ${item}`);
+    .map(
+      (item) =>
+        `Review required: critical item may not be preserved exactly: ${item}`,
+    );
 }
 
 function uniqueStrings(values: string[]): string[] {
@@ -493,7 +505,9 @@ function asString(value: unknown): string {
 
 function asStringArray(value: unknown): string[] {
   return Array.isArray(value)
-    ? uniqueStrings(value.filter((item): item is string => typeof item === "string"))
+    ? uniqueStrings(
+        value.filter((item): item is string => typeof item === "string"),
+      )
     : [];
 }
 

@@ -1,12 +1,12 @@
 import { AuthPanel } from "@/components/AuthPanel";
-import { RewriterWorkspace } from "@/components/RewriterWorkspace";
+import { HumanizerWorkspace } from "@/components/HumanizerWorkspace";
 import { hasSupabaseConfig } from "@/lib/env";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import type {
+  HumanizeHistoryItem,
+  HumanizeMode,
+  HumanizeStrength,
   LengthMode,
-  RewriteHistoryItem,
-  RewriteMode,
-  RewriteStrength,
 } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
@@ -35,7 +35,7 @@ export default async function Home() {
     .limit(10);
 
   return (
-    <RewriterWorkspace
+    <HumanizerWorkspace
       userEmail={user.email ?? "Signed in"}
       initialHistory={(data ?? []).map(toHistoryItem)}
     />
@@ -46,13 +46,13 @@ function SetupNotice() {
   return (
     <main className="mx-auto flex min-h-dvh w-full max-w-xl flex-col justify-center px-5">
       <div className="space-y-4 rounded-md border border-zinc-200 bg-white p-5">
-        <p className="text-sm font-medium text-emerald-700">AI Rewriter</p>
+        <p className="text-sm font-medium text-emerald-700">AI Humanizer</p>
         <h1 className="text-2xl font-semibold text-zinc-950">
           Configure Supabase to start
         </h1>
         <p className="text-sm leading-6 text-zinc-600">
           Add the Supabase URL and anon key in `.env.local`, then restart the
-          dev server. Gemini is also required before rewriting will work.
+          dev server. Gemini is also required before humanizing will work.
         </p>
         <pre className="overflow-x-auto rounded-md bg-zinc-950 p-3 text-xs leading-5 text-zinc-50">
           NEXT_PUBLIC_SUPABASE_URL=...
@@ -64,13 +64,13 @@ function SetupNotice() {
   );
 }
 
-function toHistoryItem(row: Record<string, unknown>): RewriteHistoryItem {
+function toHistoryItem(row: Record<string, unknown>): HumanizeHistoryItem {
   return {
     id: String(row.id),
     originalText: String(row.original_text ?? ""),
-    rewrittenText: String(row.rewritten_text ?? ""),
-    mode: normalizeValue(row.mode, "professional_report") as RewriteMode,
-    strength: normalizeValue(row.strength, "medium") as RewriteStrength,
+    humanizedText: String(row.rewritten_text ?? ""),
+    mode: normalizeValue(row.mode, "professional_report") as HumanizeMode,
+    strength: normalizeValue(row.strength, "medium") as HumanizeStrength,
     lengthMode: normalizeValue(row.length_mode, "preserve") as LengthMode,
     warnings: Array.isArray(row.warnings)
       ? row.warnings.filter((item): item is string => typeof item === "string")

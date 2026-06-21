@@ -1,7 +1,7 @@
-# AI Rewriter
+# AI Humanizer
 
-Minimal Next.js app for rewriting Indian Chartered Accountant report text in
-formal legal-style Indian English. The app uses Vercel-hosted Next.js route
+Minimal Next.js app for humanizing Indian Chartered Accountant report text in
+natural professional Indian English. The app uses Vercel-hosted Next.js route
 handlers, Supabase Auth/Postgres, and Gemini server-side generation.
 
 ## Getting Started
@@ -33,13 +33,15 @@ Open [http://localhost:3000](http://localhost:3000).
 
 ## Notes
 
-- Gemini calls only run in `src/app/api/rewrite/route.ts`.
+- Gemini calls only run in `src/app/api/humanize/route.ts`.
 - Supabase sessions are refreshed through `src/proxy.ts`.
 - Google OAuth redirects through `src/app/auth/callback/route.ts`.
 - RLS policies restrict every user-owned table to `auth.uid()`.
 - Temporary Gemini 429/5xx overloads are retried and then fall back to
   `GEMINI_FALLBACK_MODELS`.
-- The product is a professional rewrite assistant, not an AI-detection bypass tool.
+- The product is a professional humanizing assistant, not an AI-detection bypass tool.
+- The Supabase table is still named `rewrites` internally for migration
+  compatibility.
 
 ## Scripts
 

@@ -67,12 +67,13 @@ export function AuthPanel() {
     <main className="mx-auto flex min-h-dvh w-full max-w-sm flex-col justify-center px-5">
       <div className="space-y-8">
         <div className="space-y-2">
-          <p className="text-sm font-medium text-emerald-700">AI Rewriter</p>
+          <p className="text-sm font-medium text-emerald-700">AI Humanizer</p>
           <h1 className="text-2xl font-semibold text-zinc-950">
-            CA report rewriting workspace
+            Humanize CA report text
           </h1>
           <p className="text-sm leading-6 text-zinc-600">
-            Sign in to rewrite professional report text in formal Indian English.
+            Sign in to make professional CA text sound natural, clear, and
+            appropriate for Indian reporting work.
           </p>
         </div>
 

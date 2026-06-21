@@ -13,8 +13,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "AI Rewriter",
-  description: "Minimal AI rewriting workspace for Indian CA reports.",
+  title: "AI Humanizer",
+  description: "Minimal AI humanizing workspace for Indian CA reports.",
 };
 
 export default function RootLayout({
