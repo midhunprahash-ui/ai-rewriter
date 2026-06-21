@@ -10,7 +10,7 @@ import {
   type RewriteScores,
   type RewriteStrength,
 } from "@/lib/types";
-import { getGeminiApiKey, getGeminiModel } from "@/lib/env";
+import { getGeminiApiKey, getGeminiModelCandidates } from "@/lib/env";
 
 const MAX_INPUT_CHARS = 12_000;
 
@@ -102,8 +102,8 @@ export async function generateProfessionalRewrite(
 
   const ai = new GoogleGenAI({ apiKey });
   const criticalItems = extractCriticalItems(request.text);
-  const response = await ai.models.generateContent({
-    model: getGeminiModel(),
+  const response = await generateContentWithFallback(ai, {
+    models: getGeminiModelCandidates(),
     contents: buildPrompt(request, criticalItems),
     config: {
       systemInstruction: SYSTEM_INSTRUCTION,
@@ -127,6 +127,101 @@ export async function generateProfessionalRewrite(
     warnings: uniqueStrings([...result.warnings, ...preservationWarnings]),
     preservedItems: uniqueStrings([...criticalItems, ...result.preservedItems]),
   };
+}
+
+type GeminiGenerateParams = {
+  models: string[];
+  contents: string;
+  config: {
+    systemInstruction: string;
+    temperature: number;
+    topP: number;
+    maxOutputTokens: number;
+    responseMimeType: string;
+    responseJsonSchema: typeof RESPONSE_SCHEMA;
+  };
+};
+
+async function generateContentWithFallback(
+  ai: GoogleGenAI,
+  params: GeminiGenerateParams,
+) {
+  const errors: string[] = [];
+
+  for (const model of params.models) {
+    for (let attempt = 1; attempt <= 2; attempt += 1) {
+      try {
+        return await ai.models.generateContent({
+          model,
+          contents: params.contents,
+          config: params.config,
+        });
+      } catch (error) {
+        errors.push(`${model}: ${getGeminiErrorMessage(error)}`);
+
+        if (!isRetryableGeminiError(error)) {
+          throw error;
+        }
+
+        if (attempt < 2) {
+          await sleep(600 * attempt);
+        }
+      }
+    }
+  }
+
+  throw new Error(
+    `Gemini is temporarily unavailable. Tried ${params.models.join(", ")}. ${
+      errors[errors.length - 1] || "Please try again later."
+    }`,
+  );
+}
+
+function isRetryableGeminiError(error: unknown): boolean {
+  const statusCode = getErrorStatusCode(error);
+  const message = getGeminiErrorMessage(error).toLowerCase();
+
+  return (
+    statusCode === 429 ||
+    statusCode === 500 ||
+    statusCode === 502 ||
+    statusCode === 503 ||
+    statusCode === 504 ||
+    message.includes("unavailable") ||
+    message.includes("high demand") ||
+    message.includes("overloaded") ||
+    message.includes("rate limit")
+  );
+}
+
+function getErrorStatusCode(error: unknown): number | null {
+  if (!error || typeof error !== "object") {
+    return null;
+  }
+
+  const record = error as Record<string, unknown>;
+  const status = record.status ?? record.code;
+
+  if (typeof status === "number") {
+    return status;
+  }
+
+  if (typeof status === "string") {
+    const parsed = Number.parseInt(status, 10);
+    return Number.isNaN(parsed) ? null : parsed;
+  }
+
+  return null;
+}
+
+function getGeminiErrorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => {
+    setTimeout(resolve, ms);
+  });
 }
 
 export function extractCriticalItems(text: string): string[] {

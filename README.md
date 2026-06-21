@@ -19,6 +19,7 @@ NEXT_PUBLIC_SUPABASE_URL=
 NEXT_PUBLIC_SUPABASE_ANON_KEY=
 GEMINI_API_KEY=
 GEMINI_MODEL=gemini-2.5-flash
+GEMINI_FALLBACK_MODELS=gemini-2.5-flash-lite
 ```
 
 Apply the Supabase migration in `supabase/migrations/001_initial_schema.sql`,
@@ -36,6 +37,8 @@ Open [http://localhost:3000](http://localhost:3000).
 - Supabase sessions are refreshed through `src/proxy.ts`.
 - Google OAuth redirects through `src/app/auth/callback/route.ts`.
 - RLS policies restrict every user-owned table to `auth.uid()`.
+- Temporary Gemini 429/5xx overloads are retried and then fall back to
+  `GEMINI_FALLBACK_MODELS`.
 - The product is a professional rewrite assistant, not an AI-detection bypass tool.
 
 ## Scripts

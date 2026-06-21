@@ -96,7 +96,7 @@ export async function POST(request: Request) {
   } catch (error) {
     return NextResponse.json(
       { error: getErrorMessage(error, "Unable to rewrite this text.") },
-      { status: 500 },
+      { status: getRewriteErrorStatus(error) },
     );
   }
 }
@@ -170,4 +170,19 @@ async function getMonthlyRewriteCount(
 
 function getErrorMessage(error: unknown, fallback: string): string {
   return error instanceof Error ? error.message : fallback;
+}
+
+function getRewriteErrorStatus(error: unknown): number {
+  const message = getErrorMessage(error, "").toLowerCase();
+
+  if (
+    message.includes("temporarily unavailable") ||
+    message.includes("high demand") ||
+    message.includes("overloaded") ||
+    message.includes("rate limit")
+  ) {
+    return 503;
+  }
+
+  return 500;
 }

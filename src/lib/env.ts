@@ -25,3 +25,16 @@ export function getGeminiApiKey(): string | null {
 export function getGeminiModel(): string {
   return process.env.GEMINI_MODEL || "gemini-2.5-flash";
 }
+
+export function getGeminiModelCandidates(): string[] {
+  return uniqueStrings([
+    getGeminiModel(),
+    ...(process.env.GEMINI_FALLBACK_MODELS || "gemini-2.5-flash-lite")
+      .split(",")
+      .map((model) => model.trim()),
+  ]);
+}
+
+function uniqueStrings(values: string[]): string[] {
+  return Array.from(new Set(values.filter(Boolean)));
+}
