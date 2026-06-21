@@ -116,8 +116,7 @@ export async function generateProfessionalRewrite(
   });
 
   const raw = response.text ?? "";
-  const parsed = parseModelJson(raw);
-  const result = coerceRewriteResult(parsed);
+  const result = parseRewriteResult(raw);
   const preservationWarnings = findMissingCriticalItems(
     criticalItems,
     result.output,
@@ -227,7 +226,36 @@ function containsDetectorBypassIntent(text: string): boolean {
   ].some((phrase) => normalized.includes(phrase));
 }
 
-function parseModelJson(raw: string): unknown {
+function parseRewriteResult(raw: string): RewriteResult {
+  const parsed = parseModelJson(raw);
+
+  if (parsed !== null) {
+    return coerceRewriteResult(parsed);
+  }
+
+  const output = stripMarkdownFence(raw).trim();
+
+  if (!output) {
+    throw new Error("Gemini returned an empty response.");
+  }
+
+  return {
+    output,
+    changeSummary:
+      "Gemini returned an unstructured response, so it was used as the rewrite output.",
+    warnings: [
+      "Review required: Gemini did not return structured JSON for this rewrite.",
+    ],
+    preservedItems: [],
+    scores: {
+      clarity: 70,
+      formality: 70,
+      preservation: 60,
+    },
+  };
+}
+
+function parseModelJson(raw: string): unknown | null {
   const trimmed = raw.trim();
 
   if (!trimmed) {
@@ -237,12 +265,83 @@ function parseModelJson(raw: string): unknown {
   try {
     return JSON.parse(trimmed);
   } catch {
-    const jsonMatch = trimmed.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) {
-      throw new Error("Gemini returned an invalid JSON response.");
+    const withoutFence = stripMarkdownFence(trimmed);
+
+    if (withoutFence !== trimmed) {
+      try {
+        return JSON.parse(withoutFence);
+      } catch {
+        // Continue to balanced object extraction below.
+      }
     }
-    return JSON.parse(jsonMatch[0]);
+
+    const objectText = extractFirstJsonObject(withoutFence);
+
+    if (!objectText) {
+      return null;
+    }
+
+    try {
+      return JSON.parse(objectText);
+    } catch {
+      return null;
+    }
   }
+}
+
+function stripMarkdownFence(value: string): string {
+  const trimmed = value.trim();
+  const fenceMatch = trimmed.match(/^```(?:json)?\s*([\s\S]*?)\s*```$/i);
+  return fenceMatch ? fenceMatch[1].trim() : trimmed;
+}
+
+function extractFirstJsonObject(value: string): string | null {
+  const start = value.indexOf("{");
+
+  if (start === -1) {
+    return null;
+  }
+
+  let depth = 0;
+  let inString = false;
+  let escaped = false;
+
+  for (let index = start; index < value.length; index += 1) {
+    const char = value[index];
+
+    if (escaped) {
+      escaped = false;
+      continue;
+    }
+
+    if (char === "\\") {
+      escaped = true;
+      continue;
+    }
+
+    if (char === '"') {
+      inString = !inString;
+      continue;
+    }
+
+    if (inString) {
+      continue;
+    }
+
+    if (char === "{") {
+      depth += 1;
+    }
+
+    if (char === "}") {
+      depth -= 1;
+
+      if (depth === 0) {
+        return value.slice(start, index + 1);
+      }
+    }
+  }
+
+  return null;
 }
 
 function coerceRewriteResult(value: unknown): RewriteResult {
